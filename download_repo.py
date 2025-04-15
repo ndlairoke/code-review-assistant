@@ -1,8 +1,7 @@
 import os
 import subprocess
 import shutil
-
-def download_repo(url: str, author: str, start_date: str, end_date: str, save_path: str):
+def download_repo(url: str, author: str, start_date: str, end_date: str, save_path: str) -> None:
     """This function clones repo and finds files commited during a certain period of time with a certain author
         
         url: the url of the repo
@@ -53,7 +52,7 @@ def download_repo(url: str, author: str, start_date: str, end_date: str, save_pa
             os.makedirs(os.path.dirname(dst_path), exist_ok=True)
             shutil.copy2(src_path, dst_path)
     
-    print(f'Sucessfully copied files to {save_path}')
+    print(f'Successfully copied the files to {save_path}')
 
     # камбек в исходную папку
     os.chdir("..")
