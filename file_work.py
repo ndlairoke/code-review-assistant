@@ -23,3 +23,4 @@ def delete_file(filename: str) -> None:
         os.remove(filename)
     except FileNotFoundError:
         pass
+
