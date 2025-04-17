@@ -4,28 +4,60 @@ from uuid import uuid4
 from docx import Document
 from docx2pdf import convert
 import datetime as dt
+import json
 
 def make_prompt(code_text: str) -> str:
     """"This function makes prompt for analyzing code
         code_text: text of the code to analyze
     """
 
-    return f""""Analyze the following code:
-        1.Point out any anti-patterns and code smells.
-        2.Suggest improvements.
-        3. If there's any legacy code you should point it out
-        4. If you notice an anti-pattern but there's no other possible solution, point it out as a potential issue.
+    return """"
+        You are a professional code reviewer specializing in software quality analysis.
+        You are given code to analyze based on the following criteria.
+        The response must be strictly structured in JSON format, where for each criterion the following is specified:
+        - Rating from 0 to 10 (10 is excellent, 0 is very bad)
+        - Comments on what was good or bad
+        - Examples of problem areas (if any)
+        - Label `legacy_context`: true if the problem is due to legacy technologies
+        - Label `forced_solution`: true if the bad solution was the only possible one within the constraints
 
-        Your answer should contain the following points:
-        1. Anti-patterns, code smells.
-        2. Suggestions for improvements.
-        3. Potential issues if any
-        4. Legacy code if any
-        Do not input any code in your answer
+        Criterias:
+        1. Code Smells – repetitive code, long methods, redundant conditions, poor organization.
+        2. Anti-Patterns – presence of architectural and design anti-patterns (e.g. God Object, Spaghetti Code, etc.)
+        3. Legacy Compatibility – if the code is old, evaluate how adequate the solutions are in the context of their time and 
+            environment constraints.
 
-        Answer in Russian only.
+        Output must look like this:
+
+        json
+        {
+            'Code Smells': {
+                'score': 6,
+                'comment': 'Repetetive code',
+                'examples': ['line 40-45'],
+                'legacy_context': false,
+                'forced_solution': false
+            },
+            
+            'Anti Patterns': {
+                "score": 4,
+                "comment": "Singleton applied in wrong place",
+                "examples": ["line 70"],
+                "legacy_context": true,
+                "forced_solution": true
+            },
+
+            'Legacy Compatibility': {
+                'score': 10,
+                'comment': "The solutions are adequate for their time",
+                'examples': [],
+                'legacy_context': false,
+                'forced_solution': false
+            }
+        }
+        
         The code to analyze is:
-        {code_text}"""
+        """ + code_text
 
 def mistral_analyze(prompt: str, history: str = "") -> str:
     """This function analyzes code text on having anti patterns and code smells using mistral
@@ -49,6 +81,7 @@ def mistral_analyze(prompt: str, history: str = "") -> str:
         "prompt": full_prompt,
         "stream": False
     })
+
     return response.json()['response']
 
 def analyze_code_files(files: list[str]) -> str:
@@ -74,11 +107,12 @@ def analyze_code_files(files: list[str]) -> str:
         code = read_file(file)
         prompt = make_prompt(code)
         result = mistral_analyze(prompt)
+        json_result = json.loads(result, cls=LazyDecoder)
         write_file(history_file, f"User: {prompt}\nAssistant: {result}\n")
         
         p = report.add_paragraph()
         p.add_run(f"Файл: {file}\n").bold = True
-        report.add_paragraph(f'{result}\n\n')
+        write_json_to_docx_file(report, json_result)
 
     review_prompt = """According to the code and found anti-patterns give your subjective opinion on the developer and describe the next point:
     1. How good are their skills?
