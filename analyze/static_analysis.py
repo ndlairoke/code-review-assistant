@@ -48,7 +48,12 @@ def stat_analyze_diff(diff: str) -> None:
 
 
 def extract_added_lines(diff_path: str) -> str:
-    """Извлекает только добавленные строки ('+') из .diff-файла."""
+    """
+    Извлекает только добавленные строки ('+') из .diff-файла.
+    
+    Args:
+        diff_path: Путь к файлу с диффом.
+    """
     added_lines = []
     with open(diff_path, 'r', encoding='utf-8', errors='replace') as f:
         for line in f:
@@ -57,7 +62,14 @@ def extract_added_lines(diff_path: str) -> str:
     return ''.join(added_lines)
 
 def run_flake8_analysis(diff_path: str) -> List[Dict]:
-    """Анализирует только добавленный код с помощью flake8."""
+    """
+    Анализирует только добавленный код с помощью flake8.
+    
+    Args:
+        diff_path: Путь к файлу с диффом.
+    Returns:
+        Список словарей с информацией об ошибках и предупреждениях flake8.
+    """
     try:
         content = extract_added_lines(diff_path)
         if not content:
@@ -97,7 +109,14 @@ def run_flake8_analysis(diff_path: str) -> List[Dict]:
         return []
 
 def run_bandit_analysis(diff_path: str) -> List[Dict]:
-    """Запускает bandit для анализа безопасности кода и возвращает результаты."""
+    """
+    Запускает bandit для анализа безопасности кода и возвращает результаты.
+    
+    Args:
+        diff_path: Путь к файлу с диффом.
+    Returns:
+        Список словарей с информацией об ошибках безопасности.
+    """
     try:
         # Создаем временный файл для анализа, так как bandit не поддерживает stdin
         temp_file = Path(diff_path).with_suffix('.py')

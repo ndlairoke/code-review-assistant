@@ -3,8 +3,14 @@ import json
 from utils.json_docx_work import *
 
 def make_prompt(code_text: str) -> str:
-    """"This function makes prompt for analyzing code
-        code_text: text of the code to analyze
+    """"
+    Формирование промпта для анализа кода на наличие код смеллов и антипаттернов.
+        
+    Args:
+    code_text (str): Исходный код программы, который необходимо проанализировать
+        
+    Returns:
+        str: Сформированный промпт
     """
 
     return """"
@@ -74,9 +80,16 @@ def make_prompt(code_text: str) -> str:
         """ + code_text
 
 def mistral_analyze(prompt: str, history: str = "") -> dict:
-    """This function analyzes code text on having anti patterns and code smells using mistral
-        code: code to analyze
-        history: history of previous responses
+    """
+    Анализ кода с помощью модели Mistral на наличие антипаттернов и код смеллов
+
+    Args:
+        prompt (str): Код для анализа
+        history (str): История диалога с моделью (по умолчанию пустая строка)
+
+    Returns:
+        dict: Результат анализа кода в виде JSON-а
+        
     """
     # Инициализируем историю диалога, если она есть
     talk_history = []

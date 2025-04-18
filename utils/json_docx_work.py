@@ -2,7 +2,13 @@ import json
 import re
 
 class LazyDecoder(json.JSONDecoder):
+    """
+    Декодер, который позволяет избежать ошибок при декодировании JSON, содержащего экранированные обратные косые черты
+    """
     def decode(self, s, **kwargs):
+        """
+        Декодирование строки в JSON
+        """
         regex_replacements = [
             (re.compile(r'([^\\])\\([^\\])'), r'\1\\\\\2'),
             (re.compile(r',(\s*])'), r'\1'),
@@ -13,10 +19,12 @@ class LazyDecoder(json.JSONDecoder):
 
 def write_json_to_docx_file(file: str, json: dict) -> None:
     """
-    This function writes json to docx file
-    file: docx file
-    json: json to write
-
+    Запись JSON в файл docx
+    Args:
+        file: файл для записи
+        json: JSON
+    
+    Example:
     JSON must be in this format:
     {
         "name": {
@@ -37,6 +45,14 @@ def write_json_to_docx_file(file: str, json: dict) -> None:
             p.add_run(clean_text)
 
 def write_to_docx_file(file: str, heading:str, text) -> None:
+    """
+    Запись в файл docx
+    Args:
+        file: файл для записи
+        heading: заголовок
+        text: текст
+    """
+    
     file.add_heading(heading, level=2)
     p = file.add_paragraph('')
     if text == []:

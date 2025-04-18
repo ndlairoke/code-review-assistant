@@ -2,9 +2,13 @@ from unidiff import PatchSet
 from pathlib import Path
 
 def parse_diff_to_code_files(diff_path: str, output_dir: str) -> None:
-    """This function parses diff to code files
-        diff: diff to parse
-        Returns: dict with file name and code
+    """
+    Восстанавливает исходный код из diff файла и сохраняет его в отдельную папку
+    Args:
+        diff_path: путь к файлу diff
+        output_dir: путь к папке, куда будут сохранены исходные файлы
+    Returns:
+        None
     """
     patch = PatchSet.from_filename(diff_path)
     Path(output_dir).mkdir(parents=True, exist_ok=True)

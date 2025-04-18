@@ -12,7 +12,16 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def parse_github_url(url: str) -> tuple[str, str]:
-    """Извлекает владельца и название репозитория из URL GitHub."""
+    """
+    Извлекает владельца и название репозитория из URL GitHub.
+    
+    Args:
+        url (str): URL GitHub репозитория.
+
+    Returns:
+        tuple[str, str]: Кортеж, содержащий владельца и название репозитория.
+    """
+
     pattern = r'https?://github\.com/([^/]+)/([^/]+)'
     match = re.match(pattern, url)
     if not match:
@@ -20,7 +29,17 @@ def parse_github_url(url: str) -> tuple[str, str]:
     return match.groups()
 
 def save_diff_to_file(diff_content: str, pr_number: int, output_dir: str) -> str:
-    """Сохраняет дифф в файл и возвращает путь к файлу."""
+    """
+    Сохраняет дифф в файл и возвращает путь к файлу.
+    
+    Args:
+        diff_content (str): Содержимое диффа.
+        pr_number (int): Номер PR.
+        output_dir (str): Путь к директории для сохранения файлов.
+
+    Returns:
+        str: Путь к сохраненному файлу.
+    """
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     file_path = os.path.join(output_dir, f"pr_{pr_number}_diff.diff")
     with open(file_path, 'w', encoding='utf-8') as f:
@@ -38,6 +57,17 @@ def get_diffs(
     """
     Получает диффы для merge requests, проверяя email в коммитах.
     Сохраняет изменения коммитов только указанного автора.
+
+    Args:
+        github_url (str): URL GitHub репозитория.
+        email (str): Email для фильтрации коммитов.
+        start_date (datetime): Начальная дата.
+        end_date (datetime): Конечная дата.
+        access_token (Optional[str]): Токен доступа к GitHub API.
+        output_dir (str): Путь к директории для сохранения файлов.
+
+    Returns:
+        List[Dict]: Список словарей, содержащих информацию о PR и пути к файлам с изменениями.
     """
     try:
         # Инициализация клиента GitHub

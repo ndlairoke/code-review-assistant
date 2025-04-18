@@ -20,7 +20,21 @@ def form_report(github_url: str,
     email: str,
     start_date: datetime,
     end_date: datetime,
-    access_token: Optional[str] = None):
+    access_token: Optional[str] = None) -> str:
+
+    """
+    Формирование pdf-отчета о качестве кода и наличию в нем различных проблем и нарушений
+
+    Args:
+        github_url (str): ссылка на репозиторий
+        email (str): почта пользователя, для которого будет формироваться отчет
+        start_date (datetime): дата начала анализа
+        end_date (datetime): дата конца анализа
+        access_token (str): токен гитхаба для доступа к репозиторию
+
+    Returns:
+        str: путь к созданному pdf-отчету
+    """
 
     time = datetime.now().strftime("%Y-%m-%d_%H-%M")
     diff_output_dir = f'diff-{time}'
@@ -87,10 +101,15 @@ def form_report(github_url: str,
     return report_name + '.pdf'
 
 def analyze_diff_and_write_in_docx(diff: str, output_dir: str, docx: str, history_file: str) -> None:
-    """This function analyzes diff file and gives feedback about it and how good the developer is
-        diff_path: path to diff file
-        docx: path to docx file
-        history_file: path to history files
+    """
+    Анализ diff файла и запись результата в файл отчета
+    Args:
+        diff (str): путь к diff файлу
+        output_dir (str): директория для сохранения файлов
+        docx (str): путь к файлу с отчетом
+        history_file (str): путь к файлу с историей анализов
+    Returns:
+        None
     """
     # сумма очков за каждый критерий * вес критерия
     score = 0
@@ -127,6 +146,15 @@ def analyze_diff_and_write_in_docx(diff: str, output_dir: str, docx: str, histor
     return {len(diff_files): score}
 
 def make_review_and_write_in_docx(docx: str, history_file: str) -> None:
+    """
+    Формирование общего обзора о разработчике на основе истории анализов с помощью модели Mistral
+    Args:
+        docx (str): путь к файлу с отчетом
+        history_file (str): путь к файлу с историей анализов
+    Returns:
+        None
+    """
+
     review_prompt = """
         You are an experienced team leader and code reviewer. Your job is to give the developer feedback on the quality of their code.
         Analyze the code you've seen and what you've said about it for the following aspects:
