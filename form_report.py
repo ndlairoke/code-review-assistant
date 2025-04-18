@@ -23,8 +23,8 @@ def form_report(github_url: str,
     end_date: datetime,
     access_token: Optional[str] = None):
 
-    temporary_time = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    temporary_dir = f'./temporary-{temporary_time}'
+    time = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    diff_output_dir = f'diff-{time}'
 
     diffs = get_diffs(
         github_url=github_url,
@@ -33,17 +33,16 @@ def form_report(github_url: str,
         end_date=end_date,
         # токен гитхаба из переменных окружения
         access_token=access_token,
-        output_dir=f"{temporary_dir}/diffs"
+        output_dir=diff_output_dir
     )
     for diff in diffs:
         logger.info(f"PR #{diff['pr_number']}: {diff['title']} (Diff saved to {diff['diff_path']})")
         author = diff['author']
     logger.info(f"Найдено {len(diffs)} PR")
     
-    time = datetime.now().strftime("%Y-%m-%d_%H-%M")
     file_count = 0
     score = 0
-    history_file = f'{temporary_dir}/history.txt'
+    history_file = f'history-{author}-{time}.txt'
 
     report = Document()
     report.add_heading('Отчет об оценке качества кода', 0)
@@ -60,7 +59,7 @@ def form_report(github_url: str,
         p.add_run(str(diff["commit_sha"]))
 
         time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_dir = f'{temporary_dir}/restored/{author}-{time}'
+        output_dir = f'restored/{author}-{time}'
 
         diff_dict = analyze_diff_and_write_in_docx(diff['diff_path'], output_dir, report, history_file)
                     
@@ -74,14 +73,17 @@ def form_report(github_url: str,
         score /= file_count * 10
 
         p = report.add_paragraph()
-        p.add_run('Общая оценка: ').bold = True
+        p.add_run('\nОБЩАЯ ОЦЕНКА: ').bold = True
         p.add_run(str(score))
 
     report_name = f'report-{author}-{time}'
-    report.save(f'{temporary_dir}/{report_name}.docx')
-    convert(f'{temporary_dir}/{report_name}.docx', report_name + '.pdf')
+    report.save(f'{report_name}.docx')
+    convert(report_name +'.docx', report_name + '.pdf')
 
-    delete_dir(temporary_dir)
+    delete_dir('restored')
+    delete_dir(diff_output_dir)
+    delete_file(report_name +'.docx')
+    delete_file(history_file)
 
     return report_name + '.pdf'
 
@@ -125,7 +127,6 @@ def analyze_diff_and_write_in_docx(diff_path: str, output_dir: str, docx: str, h
         #     small_json = stat_result[key]
         #     score += small_json['score'] * WEIGHTS[key]
 
-
     # возвращаем словарь {кол-во файлов: общая оценка} для формирования оценки разработчика
     return {len(diff_files): score}
 
@@ -141,16 +142,11 @@ def make_review_and_write_in_docx(docx: str, history_file: str) -> None:
         Make sure to use double quotes in JSON!!!! DON'T repeat the text in the example!
         Output must look like this:
 
-        json
         {
             "Overall Review": {
-                "strengths": "The code is well structured, modules are logically separated. 
-                                Explicit typing is used",
-                "improvements": "In places the code style is not followed - indents and line lengths. 
-                                    Repetitive code should be avoided, for example, in functions X and Y",
-                "recommendations": "Learn SOLID principles and start applying them in the architecture.
-                Try using linters (e.g. flake8, eslint) for automatic style control.
-                Understand design patterns, especially in terms of separation of concerns"
+                "strengths": "...",
+                "improvements": "...",
+                "recommendations": "..."
             }
         }
 
@@ -158,5 +154,5 @@ def make_review_and_write_in_docx(docx: str, history_file: str) -> None:
         """
     history = read_file(history_file)
     result = mistral_analyze(review_prompt, history)
-    
+
     write_json_to_docx_file(docx, result)
