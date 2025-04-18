@@ -33,7 +33,8 @@ def write_json_to_docx_file(file: str, json: dict) -> None:
         for k in small_json.keys():
             p = file.add_paragraph('')
             p.add_run(f'{k}: ').bold = True
-            p.add_run(str(small_json[k]))
+            clean_text = str(small_json[k]).replace("\n", "   ")
+            p.add_run(clean_text)
 
 def write_to_docx_file(file: str, heading:str, text) -> None:
     file.add_heading(heading, level=2)

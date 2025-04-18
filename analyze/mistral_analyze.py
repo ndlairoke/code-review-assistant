@@ -8,52 +8,66 @@ def make_prompt(code_text: str) -> str:
     """
 
     return """"
-        You are a professional code reviewer specializing in software quality analysis.
-        You are given code to analyze based on the following criteria.
-        The response must be strictly structured in JSON format, where for each criterion the following is specified:
-        - Rating from 0 to 10 (10 is excellent, 0 is very bad)
-        - Comments on what was good or bad
-        - Examples of problem areas (if any)
-        - Label `legacy_context`: true if the problem is due to legacy technologies
-        - Label `forced_solution`: true if the bad solution was the only possible one within the constraints
+        You are a senior code reviewer and software quality expert. Your task is to analyze the given code strictly and precisely, based on the criteria below.
 
-        Criterias:
-        1. Code Smells – repetitive code, long methods, redundant conditions, poor organization.
-            If there's no smells, rate it as 10. The more smells the lower the score.
-        2. Anti-Patterns – presence of architectural and design anti-patterns (e.g. God Object, Spaghetti Code, etc.). 
-            If there's no anti-patterns, rate it as 10. The more anti-patterns the lower the score.
-        3. Legacy Compatibility – if the code is old, evaluate how adequate the solutions are in the context of their time and 
-            environment constraints.
-            If there's no legacy code, rate is as 10. The more legacy code the lower the score.
+        You must respond **only in valid JSON format**, using **double quotes only** for all fields. Each criterion must contain:
 
-        Make sure to use double quotes in JSON!!!! You don't need to repeat the text in the example!
-        Output must look like this:
+        - `"score"`: Integer from 0 (very bad) to 10 (excellent)
+        - `"comment"`: Short summary of issues or good points
+        - `"examples"`: **Real problematic lines of code** (not descriptions!), extracted exactly as-is from the input. If no issues – leave as empty string.
+        - `"suggestions"`: Clear, practical suggestion(s) on how to fix or improve the examples provided
+        - `"solution"`: A corrected version of the problematic code from `"examples"`, applying the suggestions above
+        - `"legacy_context"`: true if the issue is caused by legacy technology or outdated standards
+        - `"forced_solution"`: true if the original code is bad, but there's no better option due to constraints
 
-        json
+        Make sure that:
+        - `"examples"` must contain **real code lines from the input** that illustrate the issue
+        - `"solution"` must contain an **improved version of the actual example lines**
+        - `"suggestions"` must be relevant to the specific problem in `"examples"`
+        - If there are no issues, use empty strings for `"examples"`, `"suggestions"` and `"solution"` and give a `"score"` of 10
+
+        Criteria:
+        1. **Code Smells** – detect signs of poor quality like: duplicated logic, long functions, deeply nested code, unclear naming, dead code.
+        2. **Anti-Patterns** – detect bad design or architecture practices like: God Object, Spaghetti Code, Magic Numbers, overuse of global state, etc.
+        3. **Legacy Compatibility** – determine whether the code is old, and if the implementation was acceptable for its time and technical environment.
+
+        Respond in the following JSON format:
+
         {
-            "CodeSmells": {
-                "score": 6,
-                "comment": "Repetetive code",
-                "examples": "line 40-45, line 60-70",
-                "legacy_context": false,
-                "forced_solution": false
-            },
-            
-            "AntiPatterns": {
-                "score": 4,
-                "comment": "Singleton applied in wrong place",
-                "examples": "line 80",
-                "legacy_context": true,
-                "forced_solution": true
-            },
+        "CodeSmells": {
+            "score": 6,
+            "comment": "Long method and repeated logic",
+            "examples": [
+            "for (int i = 0; i < list.size(); i++) { process(list.get(i)); }",
+            "for (int i = 0; i < list.size(); i++) { process(list.get(i)); }"
+            ],
+            "suggestions": "Extract repeated loop logic into a helper method to improve readability and reduce duplication.",
+            "solution": "void processList(List<Item> list) {\n  for (Item item : list) {\n    process(item);\n  }\n}",
+            "legacy_context": false,
+            "forced_solution": false
+        },
+        
+        "AntiPatterns": {
+            "score": 3,
+            "comment": "God Object pattern detected in Manager class",
+            "examples": [
+            "public class Manager { private DB db; private Logger log; private EmailService email; /* ... */ }"
+            ],
+            "suggestions": "Break the Manager class into smaller single-responsibility classes using proper separation of concerns.",
+            "solution": "public class EmailManager { private EmailService email; /* ... */ }\npublic class DBManager { private DB db; /* ... */ }",
+            "legacy_context": false,
+            "forced_solution": false
+        },
 
-            "LegacyCompatibility": {
-                "score": 10,
-                "comment": "The solutions are adequate for their time",
-                "examples": "",
-                "legacy_context": false,
-                "forced_solution": false
-            }
+        "LegacyCompatibility": {
+            "score": 10,
+            "comment": "The code reflects acceptable practices for the platform and era.",
+            "examples": "",
+            "suggestions": "",
+            "solution": "",
+            "legacy_context": true,
+            "forced_solution": false
+        }
         }
         
         The code to analyze is:
