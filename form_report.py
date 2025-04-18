@@ -23,8 +23,9 @@ def form_report(github_url: str,
     end_date: datetime,
     access_token: Optional[str] = None):
 
-    temporary_time = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    temporary_dir = f'./temporary-{temporary_time}'
+    # temporary_time = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    # temporary_dir = f'./temporary-{temporary_time}'
+    time = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
     diffs = get_diffs(
         github_url=github_url,
@@ -33,17 +34,16 @@ def form_report(github_url: str,
         end_date=end_date,
         # токен гитхаба из переменных окружения
         access_token=access_token,
-        output_dir=f"{temporary_dir}/diffs"
+        output_dir=f"diffs-{time}"
     )
     for diff in diffs:
         logger.info(f"PR #{diff['pr_number']}: {diff['title']} (Diff saved to {diff['diff_path']})")
         author = diff['author']
     logger.info(f"Найдено {len(diffs)} PR")
     
-    time = datetime.now().strftime("%Y-%m-%d_%H-%M")
     file_count = 0
     score = 0
-    history_file = f'{temporary_dir}/history.txt'
+    history_file = f'history-{author}-{time}.txt'
 
     report = Document()
     report.add_heading('Отчет об оценке качества кода', 0)
@@ -60,7 +60,7 @@ def form_report(github_url: str,
         p.add_run(str(diff["commit_sha"]))
 
         time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_dir = f'{temporary_dir}/restored/{author}-{time}'
+        output_dir = f'./restored/{author}-{time}'
 
         diff_dict = analyze_diff_and_write_in_docx(diff['diff_path'], output_dir, report, history_file)
                     
@@ -68,20 +68,23 @@ def form_report(github_url: str,
             file_count += key
             score += value
         
-    make_review_and_write_in_docx(report, history_file)
+    # make_review_and_write_in_docx(report, history_file)
 
     if file_count != 0:
         score /= file_count * 10
 
         p = report.add_paragraph()
-        p.add_run('Общая оценка: ').bold = True
+        p.add_run('\nОБЩАЯ ОЦЕНКА: ').bold = True
         p.add_run(str(score))
 
     report_name = f'report-{author}-{time}'
-    report.save(f'{temporary_dir}/{report_name}.docx')
-    convert(f'{temporary_dir}/{report_name}.docx', report_name + '.pdf')
+    report.save(f'{report_name}.docx')
+    convert(report_name +'.docx', report_name + '.pdf')
 
-    delete_dir(temporary_dir)
+    delete_dir(output_dir)
+    delete_dir(f'diffs-{time}')
+    delete_file(report_name +'.docx')
+    delete_file(history_file)
 
     return report_name + '.pdf'
 
@@ -158,5 +161,5 @@ def make_review_and_write_in_docx(docx: str, history_file: str) -> None:
         """
     history = read_file(history_file)
     result = mistral_analyze(review_prompt, history)
-    
+
     write_json_to_docx_file(docx, result)

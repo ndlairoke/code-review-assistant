@@ -74,13 +74,11 @@ def mistral_analyze(prompt: str, history: str = "") -> dict:
     talk_history.append({f"User: {prompt}"})
     full_prompt = "\n".join([str(item) for item in talk_history]) + "\nAssistant:"
 
-
     print("Mistral is working!")
     response = requests.post("http://localhost:11434/api/generate", json={
         "model": "mistral",
         "prompt": full_prompt,
         "stream": False
     })
-    print(response.json()['response'])
 
     return json.loads(response.json()['response'], cls=LazyDecoder)
