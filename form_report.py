@@ -26,6 +26,7 @@ def form_report(github_url: str,
     # temporary_time = datetime.now().strftime("%Y-%m-%d_%H-%M")
     # temporary_dir = f'./temporary-{temporary_time}'
     time = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    diff_output_dir = f'diff-{time}'
 
     diffs = get_diffs(
         github_url=github_url,
@@ -34,7 +35,7 @@ def form_report(github_url: str,
         end_date=end_date,
         # токен гитхаба из переменных окружения
         access_token=access_token,
-        output_dir=f"diffs-{time}"
+        output_dir=diff_output_dir
     )
     for diff in diffs:
         logger.info(f"PR #{diff['pr_number']}: {diff['title']} (Diff saved to {diff['diff_path']})")
@@ -60,7 +61,7 @@ def form_report(github_url: str,
         p.add_run(str(diff["commit_sha"]))
 
         time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_dir = f'./restored/{author}-{time}'
+        output_dir = f'restored-{author}-{time}'
 
         diff_dict = analyze_diff_and_write_in_docx(diff['diff_path'], output_dir, report, history_file)
                     
@@ -82,7 +83,7 @@ def form_report(github_url: str,
     convert(report_name +'.docx', report_name + '.pdf')
 
     delete_dir(output_dir)
-    delete_dir(f'diffs-{time}')
+    delete_dir(diff_output_dir)
     delete_file(report_name +'.docx')
     delete_file(history_file)
 
