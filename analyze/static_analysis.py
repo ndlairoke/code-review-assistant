@@ -7,25 +7,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def stat_analyze_diffs(diffs_data: List[Dict], output_json: str = "analysis_results.json") -> None:
+def stat_analyze_diff(diff: str) -> None:
     """
     Анализирует диффы с помощью flake8 и bandit, сохраняет результаты в JSON.
     
     Args:
         diffs_data: Список словарей с информацией о PR (результат работы get_diffs)
-        output_json: Путь для сохранения результатов анализа
     """
-    results = []
+    pr_number = diff['pr_number']
+    diff_path = diff['diff_path']
     
-    for diff_info in diffs_data:
-        try:
-            pr_number = diff_info['pr_number']
-            diff_path = diff_info['diff_path']
-            
-            if not os.path.exists(diff_path):
-                logger.warning(f"Файл диффа {diff_path} для PR #{pr_number} не найден")
-                continue
-            
+    try:
+        if not os.path.exists(diff_path):
+            logger.warning(f"Файл диффа {diff_path} для PR #{pr_number} не найден")
+        else:  
             # Анализ с flake8
             flake8_result = run_flake8_analysis(diff_path)
             
@@ -35,27 +30,22 @@ def stat_analyze_diffs(diffs_data: List[Dict], output_json: str = "analysis_resu
             # Формируем результат
             analysis_result = {
                 'pr_number': pr_number,
-                'title': diff_info['title'],
-                'merged_at': diff_info['merged_at'],
-                'author': diff_info['author'],
-                'commit_sha': diff_info['commit_sha'],
+                'title': diff['title'],
+                'merged_at': diff['merged_at'],
+                'author': diff['author'],
+                'commit_sha': diff['commit_sha'],
                 'flake8_issues': flake8_result,
                 'bandit_issues': bandit_result,
-                'github_url': f"https://github.com/{diff_info.get('repo_owner', '')}/{diff_info.get('repo_name', '')}/pull/{pr_number}"
+                'github_url': f"https://github.com/{diff.get('repo_owner', '')}/{diff.get('repo_name', '')}/pull/{pr_number}"
             }
             
-            results.append(analysis_result)
             logger.info(f"Анализ PR #{pr_number} завершен: {len(flake8_result)} issues flake8, {len(bandit_result)} issues bandit")
+
+            return analysis_result
             
-        except Exception as e:
-            logger.error(f"Ошибка при анализе PR #{pr_number}: {str(e)}")
-            continue
-    
-    # Сохраняем результаты в JSON
-    with open(output_json, 'w', encoding='utf-8') as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
-    
-    logger.info(f"Результаты анализа сохранены в {output_json}")
+    except Exception as e:
+        logger.error(f"Ошибка при анализе PR #{pr_number}: {str(e)}")
+
 
 def extract_added_lines(diff_path: str) -> str:
     """Извлекает только добавленные строки ('+') из .diff-файла."""

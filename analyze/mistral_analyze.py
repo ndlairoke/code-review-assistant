@@ -1,6 +1,6 @@
 import requests
 import json
-from utils.json_work import *
+from utils.json_docx_work import *
 
 def make_prompt(code_text: str) -> str:
     """"This function makes prompt for analyzing code

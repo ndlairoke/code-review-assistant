@@ -4,16 +4,15 @@ from docx import Document
 from docx2pdf import convert
 
 from utils.file_work import *
-from utils.json_work import *
+from utils.json_docx_work import *
 from utils.diff_work import *
 from analyze.mistral_analyze import *
+from analyze.static_analysis import *
 from download_repo import *
 
 WEIGHTS = {
-    "Security": 3.0,
-    "CodeStyle": 1.5,
-    "CodeSmells": 2.0,
-    "AntiPatterns": 2.5,
+    "CodeSmells": 4.0,
+    "AntiPatterns": 5.0,
     "LegacyCompatibility": 1.0
 }
 
@@ -61,7 +60,7 @@ def form_report(github_url: str,
         time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         output_dir = f'restored/{author}-{time}'
 
-        diff_dict = analyze_diff_and_write_in_docx(diff['diff_path'], output_dir, report, history_file)
+        diff_dict = analyze_diff_and_write_in_docx(diff, output_dir, report, history_file)
                     
         for key, value in diff_dict.items():
             file_count += key
@@ -73,8 +72,8 @@ def form_report(github_url: str,
         score /= file_count * 10
 
         p = report.add_paragraph()
-        p.add_run('\nОБЩАЯ ОЦЕНКА: ').bold = True
-        p.add_run(str(score))
+        p.add_run('\nОЦЕНКА LLM-АНАЛИЗА: ').bold = True
+        p.add_run(f'{str(score)}/10')
 
     report_name = f'report-{author}-{time}'
     report.save(f'{report_name}.docx')
@@ -87,7 +86,7 @@ def form_report(github_url: str,
 
     return report_name + '.pdf'
 
-def analyze_diff_and_write_in_docx(diff_path: str, output_dir: str, docx: str, history_file: str) -> None:
+def analyze_diff_and_write_in_docx(diff: str, output_dir: str, docx: str, history_file: str) -> None:
     """This function analyzes diff file and gives feedback about it and how good the developer is
         diff_path: path to diff file
         docx: path to docx file
@@ -97,6 +96,7 @@ def analyze_diff_and_write_in_docx(diff_path: str, output_dir: str, docx: str, h
     score = 0
 
     # парсим диффы в файлы с кодом с сохраннием структуры папок
+    diff_path = diff['diff_path']
     parse_diff_to_code_files(diff_path, output_dir)
     diff_files = get_files_in_dir(output_dir)
 
@@ -104,30 +104,26 @@ def analyze_diff_and_write_in_docx(diff_path: str, output_dir: str, docx: str, h
         code = read_file(file)
         prompt = make_prompt(code)
         ai_result = mistral_analyze(prompt)
-        # ЗДЕСЬ БУДЕТ СТАТИЧЕСКИЙ АНАЛИЗ НАПРИМЕР:
-        # stat_result = static_analyze(code)
 
         # записываем результат в файл истории
         write_file(history_file, f"User: {prompt}\nAssistant: {ai_result}\n")
-        # ЗДЕСЬ БУДЕТ ЗАПИСЬ РЕЗУЛЬТАТОВ СТАТ АНАЛИЗА В ФАЙЛ ИСТОРИИ НАПРИМЕР:
-        # write_file(history_file, f"User: Great! Now find vulnerabilities and poor code style\nAssistant: {stat_result}\n")
 
         p = docx.add_paragraph()
         p.add_run(f"ФАЙЛ: {file}\n").bold = True
         write_json_to_docx_file(docx, ai_result)
-        # ЗДЕСЬ БУДЕТ ЗАПИСЬ РЕЗУЛЬТАТОВ СТАТ АНАЛИЗА В docx НАПРИМЕР:
-        # write_json_to_docx_file(docx, stat_result)
 
         for key in ai_result.keys():
             small_json = ai_result[key]
             score += small_json['score'] * WEIGHTS[key]
 
-        # # ЗДЕСЬ БУДЕТ ДОБАВЛЕНИЕ ОЧКОВ ЗА СТАТ АНАЛИЗ В SCORE НАПРИМЕР:
-        # for key in stat_result.keys():
-        #     small_json = stat_result[key]
-        #     score += small_json['score'] * WEIGHTS[key]
+    stat_result = stat_analyze_diff(diff)
+    stat_text_result = f'Vulnerabilities: {stat_result['bandit_issues']}\nPoor code style: {stat_result['flake8_issues']}'
+    write_file(history_file, f"User: Great! Now find vulnerabilities and poor code style\nAssistant: {stat_text_result}\n")
 
-    # возвращаем словарь {кол-во файлов: общая оценка} для формирования оценки разработчика
+    write_to_docx_file(docx, 'Vulnerabilities:', stat_result['bandit_issues'])
+    write_to_docx_file(docx, 'Poor code style:', stat_result['flake8_issues'])
+
+    # возвращаем словарь {кол-во файлов: общая оценка} для формирования оценки LLM-анализа разработчика
     return {len(diff_files): score}
 
 def make_review_and_write_in_docx(docx: str, history_file: str) -> None:

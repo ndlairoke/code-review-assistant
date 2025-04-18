@@ -11,7 +11,7 @@ class LazyDecoder(json.JSONDecoder):
             s = regex.sub(replacement, s)
         return super().decode(s, **kwargs)
 
-def write_json_to_docx_file(file, json) -> None:
+def write_json_to_docx_file(file: str, json: dict) -> None:
     """
     This function writes json to docx file
     file: docx file
@@ -35,5 +35,10 @@ def write_json_to_docx_file(file, json) -> None:
             p.add_run(f'{k}: ').bold = True
             p.add_run(str(small_json[k]))
 
-
-    
+def write_to_docx_file(file: str, heading:str, text) -> None:
+    file.add_heading(heading, level=2)
+    p = file.add_paragraph('')
+    if text == []:
+        p.add_run('Not found').bold = True
+    else:
+        p.add_run(text).bold = True
