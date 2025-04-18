@@ -87,7 +87,7 @@ def mistral_analyze(prompt: str, history: str = "") -> str:
 def analyze_code_files(files: list[str]) -> str:
     """This function analyzes files on having anti patterns and code smells using mistral
     and gives feedback about them and how good the developer is
-        files: files with code to analyze
+        files: list of files with code to analyze
     """
     time = dt.datetime.now().strftime("%Y-%m-%d_%H-%M")
 
@@ -107,6 +107,8 @@ def analyze_code_files(files: list[str]) -> str:
         code = read_file(file)
         prompt = make_prompt(code)
         result = mistral_analyze(prompt)
+
+        # переводи строку в json формат и обязательно используем декодером для избежания ошибок в работе программы
         json_result = json.loads(result, cls=LazyDecoder)
         write_file(history_file, f"User: {prompt}\nAssistant: {result}\n")
         
@@ -114,18 +116,37 @@ def analyze_code_files(files: list[str]) -> str:
         p.add_run(f"Файл: {file}\n").bold = True
         write_json_to_docx_file(report, json_result)
 
-    review_prompt = """According to the code and found anti-patterns give your subjective opinion on the developer and describe the next point:
-    1. How good are their skills?
-    2. How professional they are?
-    3. What would you rate them as a developer on a scale of 1 to 10. 
-    Answer in Russian only"""
+    review_prompt = """
+        You are an experienced team leader and code reviewer. Your job is to give the developer feedback on the quality of their code.
+        Analyze the code for the following aspects:
+        1. What good aspects did you notice in the code? (e.g. good structure, readability, attention to security, etc.)
+        2. What improvements would you suggest? (optimization, style, architecture, security, etc.)
+        3. Give 2-3 specific tips on what the developer should learn or improve to write even better
+        4. If there are positive or negative aspects associated with the outdated stack, be sure to mention it.
+
+        Return the answer in a strictly structured JSON format:
+
+        json
+        {
+            'Overall Review': {
+                "strengths": "The code is well structured, modules are logically separated. 
+                                Explicit typing is used",
+                "improvements": "In places the code style is not followed - indents and line lengths. 
+                                    Repetitive code should be avoided, for example, in functions X and Y",
+                "recommendations": "Learn SOLID principles and start applying them in the architecture.
+                Try using linters (e.g. flake8, eslint) for automatic style control.
+                Understand design patterns, especially in terms of separation of concerns"
+            }
+        }
+
+        Do not include 'legacy_context' and 'forced_solution' into the final response's JSON!!!
+        """
     history = read_file(history_file)
 
     # получаем анализ качества разработчика с учетом истории
     final_result = mistral_analyze(review_prompt, history)
-
-    report.add_heading('Ревью', level=1)
-    report.add_paragraph(f'{final_result}\n\n')
+    json_final_result = json.loads(final_result, cls=LazyDecoder)
+    write_json_to_docx_file(report, json_final_result)
 
     report_name = f'report-{time}'
     report.save(report_name + '.docx')
