@@ -1,71 +1,131 @@
+from github import Github, GithubException
+from datetime import datetime, timezone
+import re
+from typing import List, Dict, Optional
+import logging
 import os
-import subprocess
-import shutil
-def download_repo(url: str, author: str, start_date: str, end_date: str, save_path: str) -> None:
-    """This function clones repo and finds files commited during a certain period of time with a certain author
-        
-        url: the url of the repo
-        author: the author of the files
-        start_date: the start date of the period
-        end_date: the end date of the period
-        save_path: the path to save the files
+from pathlib import Path
+import requests
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def parse_github_url(url: str) -> tuple[str, str]:
+    """Извлекает владельца и название репозитория из URL GitHub."""
+    pattern = r'https?://github\.com/([^/]+)/([^/]+)'
+    match = re.match(pattern, url)
+    if not match:
+        raise ValueError("Некорректный URL репозитория GitHub")
+    return match.groups()
+
+def save_diff_to_file(diff_content: str, pr_number: int, output_dir: str) -> str:
+    """Сохраняет дифф в файл и возвращает путь к файлу."""
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    file_path = os.path.join(output_dir, f"pr_{pr_number}_diff.diff")
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(diff_content)
+    return file_path
+
+def get_diffs(
+    github_url: str,
+    email: str,
+    start_date: datetime,
+    end_date: datetime,
+    access_token: Optional[str] = None,
+    output_dir: str = "diffs"
+) -> List[Dict]:
     """
-    repo_name = url.split("/")[-1].replace(".git", "")
-    repo_path = os.path.abspath(repo_name)
-    save_path = os.path.abspath(save_path)
+    Получает диффы для merge requests, проверяя email в коммитах.
+    Сохраняет диффы в файлы и возвращает словарь с метаинформацией.
+    """
+    try:
+        # Инициализация клиента GitHub
+        g = Github(access_token) if access_token else Github()
+        
+        # Проверка валидности токена
+        if access_token:
+            try:
+                g.get_user().login
+            except GithubException as e:
+                logger.error("Недействительный токен доступа")
+                raise ValueError("Недействительный токен доступа")
 
-    # клонируем репу если ее нет
-    if not os.path.exists(repo_path):
-        subprocess.run(["git", "clone", url])
-
-    # находим файлы с автором и датами
-    os.chdir(repo_path)
-    log = ["git", "log",
-        f'--author={author}',
-        f'--since={start_date}',
-        f'--until={end_date}',
-        "--pretty=format:%H"
-        ]
-    
-    result = subprocess.run(log, stdout=subprocess.PIPE, text=True)
-    # print(result)
-    commits = result.stdout.strip().split("\n")
-    # print(commits)
-
-    print(f"Found {len(commits)} commits by {author} from {start_date} to {end_date}")
-
-    for commit in commits:
-        changed = ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", commit]
-        result = subprocess.run(changed, stdout=subprocess.PIPE, text=True)
-        files = result.stdout.strip().split("\n")
-        print(f"{commit}: {files}")
-
-        for file in files:
-            # копируем файлы с сохранением структуры папок
-            # обязательно вне репы!
-            if not file or not os.path.exists(file):
+        owner, repo_name = parse_github_url(github_url)
+        repo = g.get_repo(f"{owner}/{repo_name}")
+        
+        result = []
+        processed_prs = 0
+        found_prs = 0
+        
+        # Получаем все закрытые PR
+        pulls = repo.get_pulls(state='closed', sort='updated', direction='desc')
+        
+        for pr in pulls:
+            processed_prs += 1
+            logger.info(f"Проверяем PR #{pr.number} (обработано {processed_prs} PR)")
+            
+            # Пропускаем, если PR не был мерджен или вне диапазона дат
+            if not pr.merged_at:
+                continue
+            if not (start_date <= pr.merged_at <= end_date):
                 continue
 
-            src_path = os.path.abspath(file)
-            dst_path = os.path.join(save_path, file)
-
-            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-            shutil.copy2(src_path, dst_path)
-    
-    print(f'Successfully copied the files to {save_path}')
-
-    # камбек в исходную папку
-    os.chdir("..")
+            # Проверяем email в коммитах PR
+            email_found = False
+            try:
+                for commit in pr.get_commits():
+                    if commit.commit.author and commit.commit.author.email == email:
+                        email_found = True
+                        break
+            except GithubException as e:
+                logger.warning(f"Не удалось получить коммиты для PR #{pr.number}: {str(e)}")
+                continue
+            
+            if not email_found:
+                continue
+            
+            # Получаем diff
+            try:
+                # Используем API PyGithub для получения diff
+                diff_content = ""
+                for file in pr.get_files():
+                    diff_content += f"diff --git a/{file.filename} b/{file.filename}\n"
+                    diff_content += file.patch + "\n\n"
+                
+                if not diff_content:
+                    logger.warning(f"PR #{pr.number} не содержит изменений")
+                    continue
+                
+                # Сохраняем diff в файл
+                diff_path = save_diff_to_file(diff_content, pr.number, output_dir)
+                
+                result.append({
+                    'pr_number': pr.number,
+                    'title': pr.title,
+                    'merged_at': pr.merged_at.isoformat(),
+                    'author': pr.user.login,
+                    'diff_path': diff_path,
+                    'commit_sha': pr.merge_commit_sha
+                })
+                found_prs += 1
+                logger.info(f"Найден подходящий PR #{pr.number}")
+            
+            except Exception as e:
+                logger.error(f"Ошибка при обработке PR #{pr.number}: {str(e)}")
+                continue
         
-
-# пример: добываем файлы из репы модуля "requests" от anupam-arista с 1 февраля по 1 марта 2025
-# 4 коммита: 1 мердж и 3 файла с изменением файла models.py
-download_repo(
-    "https://github.com/psf/requests.git",
-    "anupam-arista",
-    "2025-02-01",
-    "2025-03-01",
-    "./requests_author_changes"
-)
-
-
+        logger.info(f"Обработано {processed_prs} PR, найдено {found_prs} подходящих PR")
+        return result
+    
+    except GithubException as e:
+        if e.status == 403:
+            logger.error("Нет доступа к репозиторию. Проверьте токен.")
+        elif e.status == 404:
+            logger.error("Репозиторий не найден или приватный.")
+        else:
+            logger.error(f"GitHub API Error: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Неожиданная ошибка: {str(e)}")
+        raise
