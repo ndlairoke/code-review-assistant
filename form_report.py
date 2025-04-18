@@ -23,8 +23,6 @@ def form_report(github_url: str,
     end_date: datetime,
     access_token: Optional[str] = None):
 
-    # temporary_time = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    # temporary_dir = f'./temporary-{temporary_time}'
     time = datetime.now().strftime("%Y-%m-%d_%H-%M")
     diff_output_dir = f'diff-{time}'
 
@@ -61,7 +59,7 @@ def form_report(github_url: str,
         p.add_run(str(diff["commit_sha"]))
 
         time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_dir = f'restored-{author}-{time}'
+        output_dir = f'restored/{author}-{time}'
 
         diff_dict = analyze_diff_and_write_in_docx(diff['diff_path'], output_dir, report, history_file)
                     
@@ -69,7 +67,7 @@ def form_report(github_url: str,
             file_count += key
             score += value
         
-    # make_review_and_write_in_docx(report, history_file)
+    make_review_and_write_in_docx(report, history_file)
 
     if file_count != 0:
         score /= file_count * 10
@@ -82,7 +80,7 @@ def form_report(github_url: str,
     report.save(f'{report_name}.docx')
     convert(report_name +'.docx', report_name + '.pdf')
 
-    delete_dir(output_dir)
+    delete_dir('restored')
     delete_dir(diff_output_dir)
     delete_file(report_name +'.docx')
     delete_file(history_file)
@@ -129,7 +127,6 @@ def analyze_diff_and_write_in_docx(diff_path: str, output_dir: str, docx: str, h
         #     small_json = stat_result[key]
         #     score += small_json['score'] * WEIGHTS[key]
 
-
     # возвращаем словарь {кол-во файлов: общая оценка} для формирования оценки разработчика
     return {len(diff_files): score}
 
@@ -145,16 +142,11 @@ def make_review_and_write_in_docx(docx: str, history_file: str) -> None:
         Make sure to use double quotes in JSON!!!! DON'T repeat the text in the example!
         Output must look like this:
 
-        json
         {
             "Overall Review": {
-                "strengths": "The code is well structured, modules are logically separated. 
-                                Explicit typing is used",
-                "improvements": "In places the code style is not followed - indents and line lengths. 
-                                    Repetitive code should be avoided, for example, in functions X and Y",
-                "recommendations": "Learn SOLID principles and start applying them in the architecture.
-                Try using linters (e.g. flake8, eslint) for automatic style control.
-                Understand design patterns, especially in terms of separation of concerns"
+                "strengths": "...",
+                "improvements": "...",
+                "recommendations": "..."
             }
         }
 
