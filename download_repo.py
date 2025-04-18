@@ -37,7 +37,7 @@ def get_diffs(
 ) -> List[Dict]:
     """
     Получает диффы для merge requests, проверяя email в коммитах.
-    Сохраняет диффы в файлы и возвращает словарь с метаинформацией.
+    Сохраняет изменения коммитов только указанного автора.
     """
     try:
         # Инициализация клиента GitHub
@@ -71,30 +71,30 @@ def get_diffs(
             if not (start_date <= pr.merged_at <= end_date):
                 continue
 
-            # Проверяем email в коммитах PR
-            email_found = False
+            # Получаем ВСЕ коммиты PR и фильтруем по email
             try:
-                for commit in pr.get_commits():
-                    if commit.commit.author and commit.commit.author.email == email:
-                        email_found = True
-                        break
-            except GithubException as e:
-                logger.warning(f"Не удалось получить коммиты для PR #{pr.number}: {str(e)}")
-                continue
-            
-            if not email_found:
-                continue
-            
-            # Получаем diff
-            try:
-                # Используем API PyGithub для получения diff
+                all_commits = list(pr.get_commits())
+                author_commits = [
+                    commit for commit in all_commits
+                    if commit.commit.author and commit.commit.author.email == email
+                ]
+                
+                # Пропускаем PR, если нет коммитов автора
+                if not author_commits:
+                    continue
+
+                # Собираем diff ТОЛЬКО из коммитов автора
                 diff_content = ""
-                for file in pr.get_files():
-                    diff_content += f"diff --git a/{file.filename} b/{file.filename}\n"
-                    diff_content += file.patch + "\n\n"
+                for commit in author_commits:
+                    # Получаем файлы для каждого коммита (через API)
+                    commit_details = repo.get_commit(commit.sha)
+                    for file in commit_details.files:
+                        diff_content += f"diff --git a/{file.filename} b/{file.filename}\n"
+                        if file.patch:
+                            diff_content += file.patch + "\n\n"
                 
                 if not diff_content:
-                    logger.warning(f"PR #{pr.number} не содержит изменений")
+                    logger.warning(f"PR #{pr.number} не содержит изменений автора {email}")
                     continue
                 
                 # Сохраняем diff в файл
@@ -106,13 +106,14 @@ def get_diffs(
                     'merged_at': pr.merged_at.isoformat(),
                     'author': pr.user.login,
                     'diff_path': diff_path,
-                    'commit_sha': pr.merge_commit_sha
+                    'commit_sha': pr.merge_commit_sha,
+                    'author_commits_count': len(author_commits)  # Добавим количество релевантных коммитов
                 })
                 found_prs += 1
-                logger.info(f"Найден подходящий PR #{pr.number}")
+                logger.info(f"Найден подходящий PR #{pr.number} с {len(author_commits)} коммитами автора")
             
-            except Exception as e:
-                logger.error(f"Ошибка при обработке PR #{pr.number}: {str(e)}")
+            except GithubException as e:
+                logger.warning(f"Не удалось обработать PR #{pr.number}: {str(e)}")
                 continue
         
         logger.info(f"Обработано {processed_prs} PR, найдено {found_prs} подходящих PR")
