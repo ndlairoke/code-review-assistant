@@ -58,16 +58,16 @@ uvicorn api:app --reload
 ### 2. Выполните POST-запрос
 Выполните POST-запрос к серверу через cmd, powershell, bash или postman. 
 
-Пример POST-запроса в cmd:
+Пример POST-запроса в powershell:
 ```
-curl -X POST "http://127.0.0.1:8000/generate-report" \
--H "Content-Type: application/json" \
+curl -X POST "http://127.0.0.1:8000/generate-report" `
+-H "Content-Type: application/json" `
 -d '{
   "github_url": "https://github.com/example/example",
   "email": "user@example.com",
   "start_date": "2023-01-01T00:00:00Z",
   "end_date": "2024-01-01T00:00:00Z"
-}' \
+}' `
 -o "report.pdf"
 ```
 Параметры:
@@ -86,5 +86,5 @@ curl -X POST "http://127.0.0.1:8000/generate-report" \
 ```
 Для доступа к приватным репозиториям в заголовке POST-запроса укажите токен Github:
 ```
--H "Authorization: Bearer github_token_11AABBCCDD..." \
+-H "Authorization: Bearer github_token_11AABBCCDD..." `
 ```
