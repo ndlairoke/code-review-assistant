@@ -71,6 +71,7 @@ curl -X POST "http://127.0.0.1:8000/generate-report" `
 -o "report.pdf"
 ```
 Параметры:
+
 `github_url` - URL Github-репозиторий для анализа
 
 `email` - Email автора для анализа
